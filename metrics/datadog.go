@@ -31,14 +31,14 @@ type datadogMiddleware struct {
 }
 
 func (mw *datadogMiddleware) initTraceMiddleware(stack *middleware.Stack) error {
-	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("InitMetricsMiddleware", func(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (out middleware.InitializeOutput, metadata middleware.Metadata, err error) {
+	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("InitDatadogMetricsMiddleware", func(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (out middleware.InitializeOutput, metadata middleware.Metadata, err error) {
 		ctx = context.WithValue(ctx, ddMetricTimestampKey, time.Now())
 		return next.HandleInitialize(ctx, in)
 	}), middleware.Before)
 }
 
 func (mw *datadogMiddleware) startTraceMiddleware(stack *middleware.Stack) error {
-	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("StartMetricsMiddleware", func(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (out middleware.InitializeOutput, metadata middleware.Metadata, err error) {
+	return stack.Initialize.Add(middleware.InitializeMiddlewareFunc("StartDatadogMetricsMiddleware", func(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (out middleware.InitializeOutput, metadata middleware.Metadata, err error) {
 		region := awsmiddleware.GetRegion(ctx)
 		metricName := fmt.Sprintf("aws.%s.%s", awsmiddleware.GetServiceID(ctx), awsmiddleware.GetOperationName(ctx))
 		out, metadata, err = next.HandleInitialize(ctx, in)
@@ -49,13 +49,13 @@ func (mw *datadogMiddleware) startTraceMiddleware(stack *middleware.Stack) error
 		}
 		startTime := ctx.Value(ddMetricTimestampKey).(time.Time)
 		val := endTime.Sub(startTime)
-		err = mw.ddClient.Timing(metricName, val, tags, defaultRate)
+		_ = mw.ddClient.Timing(metricName, val, tags, defaultRate)
 		return out, metadata, err
 	}), middleware.After)
 }
 
 func (mw *datadogMiddleware) deserializeTraceMiddleware(stack *middleware.Stack) error {
-	return stack.Deserialize.Add(middleware.DeserializeMiddlewareFunc("DeserializeTraceMiddleware", func(ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler) (out middleware.DeserializeOutput, metadata middleware.Metadata, err error) {
+	return stack.Deserialize.Add(middleware.DeserializeMiddlewareFunc("DeserializeDatadogMetricsMiddleware", func(ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler) (out middleware.DeserializeOutput, metadata middleware.Metadata, err error) {
 		if req, ok := in.Request.(*smithyhttp.Request); ok {
 			ctx = context.WithValue(ctx, ddMetricMethodKey, req.Method)
 			ctx = context.WithValue(ctx, metricAgentKey, req.Header.Get("User-Agent"))
